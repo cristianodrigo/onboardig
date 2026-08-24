@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Checklist de documentos</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .progress-wrap{padding:12px 20px 16px;}
+  .bar{height:8px;border-radius:9999px;background:var(--surface-sunken);overflow:hidden;}
+  .bar > span{display:block;height:100%;width:0;background:var(--success);transition:width .4s;}
+  .progress-label{font-size:13px;color:var(--ink-secondary);margin-top:6px;}
+  .list{background:var(--surface-raised);}
+  .item{display:flex;align-items:center;gap:12px;padding:16px 20px;border-top:1px solid var(--border-hairline);
+    text-decoration:none;color:inherit;min-height:64px;}
+  .item:hover{background:var(--surface-base);}
+  .doc-ico{width:36px;height:36px;border-radius:8px;background:var(--surface-sunken);
+    display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .doc-main{flex:1;min-width:0;}
+  .doc-name{font-size:15px;font-weight:500;}
+  .doc-hint{font-size:13px;color:var(--primary);margin-top:2px;}
+  .doc-motivo{font-size:12px;color:var(--danger);margin-top:2px;}
+  .instructions{margin:16px 20px;padding:14px 16px;background:var(--surface-sunken);border-radius:12px;
+    font-size:13px;color:var(--ink-secondary);line-height:1.5;}
+  .cta{padding:8px 20px 4px;}
+  .done{padding:16px 20px;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="appbar"><span class="brand"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></span><a class="toplink" href="#" onclick="logout();return false;">Sair</a></div>
+    <div class="crumb">Envio de documentos › Documentos</div>
+    <h1 id="titulo">Documentos necessários — CLT</h1>
+    <div class="progress-wrap">
+      <div class="bar" role="progressbar" id="bar" aria-valuemin="0"><span></span></div>
+      <div class="progress-label" id="progress-label"></div>
+    </div>
+    <div class="list" id="lista"></div>
+    <div class="instructions">
+      Formatos aceitos: JPG, PNG ou PDF, até 10 MB. Dica: fotografe perto de uma janela, apoie o documento numa superfície plana e mostre os quatro cantos.
+    </div>
+    <div class="cta" id="cta-wrap"><a class="btn-primary" href="/candidato-concluido.html" id="cta">Concluir</a></div>
+    <div class="done" id="done-wrap" style="display:none;">
+      <div class="alert alert-success">Documentação 100% aprovada! O RH finaliza sua admissão a partir daqui.</div>
+    </div>
+    <a class="assist" href="mailto:rh@empresa.com">Precisa de ajuda para enviar? Fale com o RH</a>
+  </div>
+<script src="/app.js"></script>
+<script>
+  (async () => {
+    const u = await requirePapel('candidato');
+    if (!u) return;
+
+    const { checklist, progresso, jornada } = await api('/jornada');
+    document.getElementById('titulo').textContent = `Documentos necessários — ${jornada.tipo_contrato_label || jornada.tipo_contrato}`;
+
+    const pct = Math.round((progresso.enviados / progresso.total) * 100);
+    const bar = document.getElementById('bar');
+    bar.setAttribute('aria-valuenow', progresso.enviados);
+    bar.setAttribute('aria-valuemax', progresso.total);
+    bar.setAttribute('aria-label', `${progresso.enviados} de ${progresso.total} documentos enviados`);
+    bar.firstElementChild.style.width = pct + '%';
+    document.getElementById('progress-label').textContent =
+      `${progresso.enviados} de ${progresso.total} documentos enviados · ${progresso.aprovados} aprovados`;
+
+    document.getElementById('lista').innerHTML = checklist.map((d) => {
+      const devol = d.status === 'devolvido'
+        ? `<div class="doc-motivo">${esc(textoDevolucao(d.motivo_devolucao))}</div>` : '';
+      const dica = d.dica ? `<div class="doc-hint">${esc(d.dica)}</div>` : '';
+      return `<a class="item" href="/candidato-upload.html?tipo=${d.tipo}">
+        <div class="doc-ico" aria-hidden="true">${d.icone}</div>
+        <div class="doc-main"><div class="doc-name">${esc(d.nome)}</div>${dica}${devol}</div>
+        ${badgeStatus(d.status)}
+      </a>`;
+    }).join('');
+
+    const temDevolvido = checklist.some((d) => d.status === 'devolvido');
+    if (progresso.aprovados === progresso.total) {
+      document.getElementById('cta-wrap').style.display = 'none';
+      document.getElementById('done-wrap').style.display = 'block';
+    } else if (temDevolvido) {
+      const devol = checklist.find((d) => d.status === 'devolvido');
+      const cta = document.getElementById('cta');
+      cta.href = `/candidato-upload.html?tipo=${devol.tipo}`;
+      cta.textContent = 'Corrigir documento devolvido';
+    }
+  })();
+</script>
+</body>
+</html>

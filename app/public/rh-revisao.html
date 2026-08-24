@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Painel do RH</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surface-raised);border-bottom:1px solid var(--border-hairline);gap:12px;}
+  .search{flex:1;max-width:320px;}
+  .search input{width:100%;min-height:40px;padding:9px 12px;border:1px solid var(--border-hairline);border-radius:8px;font-size:14px;}
+  .usermenu{font-size:13px;color:var(--ink-secondary);display:flex;gap:14px;align-items:center;white-space:nowrap;}
+  .layout{display:flex;min-height:560px;}
+  .sidebar{width:260px;border-right:1px solid var(--border-hairline);background:var(--surface-raised);overflow:auto;}
+  .side-h{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-secondary);padding:14px 16px 8px;}
+  .queue-item{display:block;width:100%;text-align:left;padding:12px 16px;border:none;border-top:1px solid var(--border-hairline);
+    background:transparent;cursor:pointer;color:inherit;font:inherit;}
+  .queue-item:hover{background:var(--surface-base);}
+  .queue-item.active{background:rgba(31,111,235,.06);border-left:3px solid var(--primary);}
+  .qi-name{font-size:14px;font-weight:500;}
+  .qi-meta{font-size:12px;color:var(--ink-secondary);margin-top:2px;}
+  .main{flex:1;padding:20px 24px;overflow:auto;}
+  .cand-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:12px;flex-wrap:wrap;}
+  .cand-name{font-size:20px;font-weight:600;display:flex;align-items:center;gap:10px;}
+  .cand-sub{font-size:13px;color:var(--ink-secondary);margin-top:4px;}
+  .bulk{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn{font-size:13px;font-weight:600;min-height:40px;padding:9px 14px;border-radius:8px;border:none;cursor:pointer;}
+  .btn-p{background:var(--primary);color:#fff;}
+  .btn-p:hover{background:var(--primary-hover);}
+  .btn-o{background:var(--surface-raised);color:var(--ink-primary);border:1px solid var(--border-hairline);}
+  .doc-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  @media (max-width:900px){.doc-grid{grid-template-columns:1fr;}}
+  .doc-card{background:var(--surface-raised);border:1px solid var(--border-hairline);border-radius:12px;padding:14px;display:flex;gap:12px;}
+  .thumb{width:64px;height:64px;border-radius:8px;background:linear-gradient(135deg,#dbe3ec,#eef2f6);display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;}
+  .doc-info{flex:1;min-width:0;}
+  .doc-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .doc-fields{font-size:12px;color:var(--ink-secondary);margin-top:4px;line-height:1.6;}
+  .doc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;align-items:center;}
+  .mini{font-size:12px;min-height:36px;padding:6px 10px;border-radius:7px;border:1px solid var(--border-hairline);background:#fff;cursor:pointer;text-decoration:none;color:inherit;display:inline-flex;align-items:center;}
+  .mini.approve{background:var(--success-soft);color:var(--success);border-color:transparent;font-weight:600;}
+  .mini.return{background:var(--danger-soft);color:var(--danger);border-color:transparent;font-weight:600;}
+  .sel{width:16px;height:16px;}
+  .motivo{font-size:12px;background:var(--danger-soft);border-radius:6px;padding:6px 8px;margin-top:8px;color:var(--danger);}
+  .audit{margin-top:24px;background:var(--surface-raised);border:1px solid var(--border-hairline);border-radius:12px;padding:14px 16px;}
+  .audit h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-secondary);margin-bottom:10px;}
+  .audit li{font-size:12px;color:var(--ink-secondary);list-style:none;padding:6px 0;border-top:1px solid var(--border-hairline);line-height:1.5;}
+  .audit li:first-child{border-top:none;}
+  .modal-back{position:fixed;inset:0;background:rgba(22,32,44,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:10;}
+  .modal-back.open{display:flex;}
+  .modal{background:#fff;border-radius:14px;width:440px;max-width:100%;padding:20px;}
+  .modal h3{font-size:16px;margin-bottom:12px;}
+  .motivos label{display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0;}
+  .empty{padding:40px;color:var(--ink-secondary);font-size:14px;text-align:center;flex:1;}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink-primary);color:#fff;
+    font-size:13px;padding:10px 16px;border-radius:8px;display:none;z-index:20;}
+</style>
+</head>
+<body class="stage-desktop">
+  <div class="browser">
+    <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="url">onboarding.gci.com.br/rh/fila</span></div>
+    <div class="topbar">
+      <a class="brand" href="/rh-revisao.html"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></a>
+      <div class="search"><label for="busca" style="position:absolute;left:-9999px;">Buscar candidato</label>
+        <input id="busca" placeholder="Buscar candidato por nome ou e-mail"></div>
+      <div class="usermenu">
+        <a class="toplink" href="/usuarios.html">Usuários</a>
+        <span id="quem"></span>
+        <a class="toplink" href="#" onclick="logout();return false;">Sair</a>
+      </div>
+    </div>
+    <div class="layout">
+      <nav class="sidebar" aria-label="Fila de candidatos">
+        <div class="side-h" id="fila-h">Candidatos</div>
+        <div id="fila"></div>
+      </nav>
+      <main class="main" id="main"><div class="empty">Selecione um candidato na fila.</div></main>
+    </div>
+  </div>
+
+  <div class="modal-back" id="modal-devolver">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dev-title">
+      <h3 id="dev-title">Devolver documento</h3>
+      <div class="motivos" id="dev-motivos"></div>
+      <div class="field" style="margin-top:10px;">
+        <label for="dev-comentario">Comentário (opcional)</label>
+        <textarea id="dev-comentario" rows="3" placeholder="Explique o caminho da correção..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button class="btn btn-o" type="button" id="dev-cancelar">Cancelar</button>
+        <button class="btn btn-p" type="button" id="dev-confirmar">Devolver</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status"></div>
+
+<script src="/app.js"></script>
+<script>
+  let fila = [];
+  let selecionado = null;   // jornada_id
+  let detalhe = null;
+  let devolverIds = [];
+
+  const toast = (msg) => {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 2200);
+  };
+
+  async function carregarFila(manterSelecao = true) {
+    const q = document.getElementById('busca').value.trim();
+    const { candidatos } = await api('/candidatos' + (q ? `?q=${encodeURIComponent(q)}` : ''));
+    fila = candidatos;
+    const aguardando = fila.filter((c) => c.progresso.aprovados < c.progresso.total);
+    document.getElementById('fila-h').textContent = `Aguardando revisão (${aguardando.length})`;
+    document.getElementById('fila').innerHTML = fila.map((c) => {
+      const p = c.progresso;
+      const estado = p.aprovados === p.total ? 'pronto' : p.devolvidos > 0 ? `${p.devolvidos} devolvido(s)` : 'em andamento';
+      return `<button class="queue-item ${c.jornada_id === selecionado ? 'active' : ''}" type="button"
+          data-id="${c.jornada_id}">
+        <div class="qi-name">${esc(c.nome)}</div>
+        <div class="qi-meta">${esc(c.tipo_contrato_label || c.tipo_contrato)} · ${p.enviados} de ${p.total} · ${estado}</div>
+      </button>`;
+    }).join('') || '<div class="empty">Nenhum candidato encontrado.</div>';
+
+    document.querySelectorAll('.queue-item').forEach((b) =>
+      b.addEventListener('click', () => abrirCandidato(Number(b.dataset.id))));
+
+    if (!manterSelecao || !selecionado || !fila.some((c) => c.jornada_id === selecionado)) {
+      if (aguardando[0]) await abrirCandidato(aguardando[0].jornada_id);
+      else if (fila[0]) await abrirCandidato(fila[0].jornada_id);
+    }
+  }
+
+  function resumoDoc(d) {
+    const partes = [];
+    const rotulos = Object.fromEntries((d.campos || []).map((c) => [c.key, c.label]));
+    for (const [k, v] of Object.entries(d.dados || {})) {
+      if (v === '' || v == null || typeof v === 'boolean') continue;
+      const rotulo = rotulos[k] || k.replace(/_/g, ' ');
+      const valor = v === 'sim' ? 'Sim' : v === 'nao' ? 'Não' : v;
+      partes.push(`${esc(rotulo)}: ${esc(valor)}`);
+    }
+    if (d.enviado_em) partes.push(`env. ${fmtData(d.enviado_em)}`);
+    const texto = partes.slice(0, 6).join(' · ');
+    const resto = partes.length > 6 ? ` <span class="hint">+${partes.length - 6} campos</span>` : '';
+    return (texto || 'Aguardando envio') + resto;
+  }
+
+  function cardDoc(d) {
+    const podeRevisar = d.status === 'em_revisao';
+    const devol = d.status === 'devolvido'
+      ? `<div class="motivo">${esc(textoDevolucao(d.motivo_devolucao))}</div>` : '';
+    const baixar = d.tem_arquivo
+      ? `<a class="mini" href="/api/documentos/${d.id}/arquivo">Baixar</a>` : '';
+    const acoes = podeRevisar
+      ? `<button class="mini approve" data-acao="aprovar" data-id="${d.id}">Aprovar</button>
+         <button class="mini return" data-acao="devolver" data-id="${d.id}">Devolver</button>${baixar}
+         <button class="mini" data-acao="corrigir" data-id="${d.id}">Corrigir cadastro</button>
+         <label title="Selecionar para ação em massa"><input type="checkbox" class="sel" data-id="${d.id}"></label>`
+      : baixar;
+    return `<article class="doc-card">
+      <div class="thumb" aria-hidden="true">${d.icone}</div>
+      <div class="doc-info">
+        <h2 class="doc-name">${esc(d.nome)} ${badgeStatus(d.status)}</h2>
+        <div class="doc-fields">${resumoDoc(d)}</div>
+        ${devol}
+        <div class="doc-actions">${acoes}</div>
+      </div>
+    </article>`;
+  }
+
+  async function abrirCandidato(jornadaId) {
+    selecionado = jornadaId;
+    document.querySelectorAll('.queue-item').forEach((b) =>
+      b.classList.toggle('active', Number(b.dataset.id) === jornadaId));
+
+    detalhe = await api(`/candidatos/${jornadaId}`);
+    const c = detalhe.candidato;
+    const p = c.progresso;
+
+    document.getElementById('main').innerHTML = `
+      <div class="cand-head">
+        <div>
+          <h1 class="cand-name">${esc(c.nome)}</h1>
+          <div class="cand-sub">${esc(c.email)} · ${esc(c.tipo_contrato_label || c.tipo_contrato)} · progresso ${p.enviados}/${p.total} · ${p.aprovados} aprovados</div>
+        </div>
+        <div class="bulk">
+          <button class="btn btn-o" type="button" id="bulk-devolver">Devolver selecionados</button>
+          <button class="btn btn-p" type="button" id="bulk-aprovar">Aprovar selecionados</button>
+        </div>
+      </div>
+      <div class="doc-grid">${detalhe.documentos.map(cardDoc).join('')}</div>
+      <div class="audit">
+        <h2>Trilha de auditoria</h2>
+        <ul>${detalhe.auditoria.map((a) =>
+          `<li><strong>${esc(a.autor || 'sistema')}</strong> — ${esc(a.acao)}
+            ${a.valor_antigo || a.valor_novo ? `<br>${esc(a.valor_antigo || '—')} → ${esc(a.valor_novo || '—')}` : ''}
+            <br><span>${fmtData(a.criado_em)}</span></li>`).join('') || '<li>Sem registros ainda.</li>'}</ul>
+      </div>`;
+
+    document.getElementById('bulk-aprovar').addEventListener('click', () => acaoEmMassa('aprovar'));
+    document.getElementById('bulk-devolver').addEventListener('click', () => acaoEmMassa('devolver'));
+    document.querySelectorAll('.doc-actions [data-acao]').forEach((b) =>
+      b.addEventListener('click', () => acaoDoc(b.dataset.acao, Number(b.dataset.id))));
+  }
+
+  async function acaoDoc(acao, docId) {
+    if (acao === 'aprovar') {
+      await api(`/documentos/${docId}/aprovar`, { method: 'POST' });
+      toast('Documento aprovado.');
+      await abrirCandidato(selecionado); await carregarFila();
+    } else if (acao === 'devolver') {
+      abrirModalDevolucao([docId]);
+    } else if (acao === 'corrigir') {
+      const novoNome = prompt('Corrigir nome do cadastro:', detalhe.candidato.nome);
+      if (novoNome && novoNome.trim() && novoNome.trim() !== detalhe.candidato.nome) {
+        await api(`/candidatos/${selecionado}`, { method: 'PATCH', body: JSON.stringify({ nome: novoNome.trim() }) });
+        toast('Cadastro corrigido e auditado.');
+        await abrirCandidato(selecionado); await carregarFila();
+      }
+    }
+  }
+
+  function acaoEmMassa(acao) {
+    const ids = [...document.querySelectorAll('.sel:checked')].map((c) => Number(c.dataset.id));
+    if (ids.length === 0) { toast('Selecione ao menos um documento em revisão.'); return; }
+    if (acao === 'devolver') return abrirModalDevolucao(ids);
+    Promise.all(ids.map((id) => api(`/documentos/${id}/aprovar`, { method: 'POST' })))
+      .then(async () => { toast(`${ids.length} documento(s) aprovados.`); await abrirCandidato(selecionado); await carregarFila(); });
+  }
+
+  function abrirModalDevolucao(ids) {
+    devolverIds = ids;
+    document.getElementById('dev-motivos').innerHTML = Object.entries(MOTIVOS).map(([k, v]) =>
+      `<label><input type="checkbox" value="${k}"> ${v}</label>`).join('');
+    document.getElementById('dev-comentario').value = '';
+    document.getElementById('modal-devolver').classList.add('open');
+  }
+
+  document.getElementById('dev-cancelar').addEventListener('click', () =>
+    document.getElementById('modal-devolver').classList.remove('open'));
+
+  document.getElementById('dev-confirmar').addEventListener('click', async () => {
+    const motivos = [...document.querySelectorAll('#dev-motivos input:checked')].map((c) => c.value);
+    const comentario = document.getElementById('dev-comentario').value.trim();
+    if (motivos.length === 0 && !comentario) { toast('Informe ao menos um motivo ou comentário.'); return; }
+    await Promise.all(devolverIds.map((id) =>
+      api(`/documentos/${id}/devolver`, { method: 'POST', body: JSON.stringify({ motivos, comentario }) })));
+    document.getElementById('modal-devolver').classList.remove('open');
+    toast('Documento(s) devolvido(s) com orientação.');
+    await abrirCandidato(selecionado); await carregarFila();
+  });
+
+  let debounce;
+  document.getElementById('busca').addEventListener('input', () => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => carregarFila(), 300);
+  });
+
+  (async () => {
+    const u = await requirePapel('rh');
+    if (!u) return;
+    document.getElementById('quem').textContent = `${u.nome.split(' ')[0]} · RH`;
+    await carregarFila(false);
+  })();
+</script>
+</body>
+</html>

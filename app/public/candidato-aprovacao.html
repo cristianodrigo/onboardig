@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Boas-vindas</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .content{padding:16px 20px 32px;text-align:left;}
+  .celebrate{font-size:44px;margin:16px 0 12px;text-align:center;}
+  h1{font-size:26px;line-height:1.2;padding:0;}
+  .lead{font-size:15px;color:var(--ink-secondary);margin-top:10px;line-height:1.5;}
+  .reassure{font-size:14px;color:var(--ink-primary);margin:14px 0 24px;font-weight:500;}
+  .footer{font-size:12px;color:var(--ink-secondary);margin-top:20px;text-align:center;line-height:1.5;}
+  .congrats-done{margin-top:16px;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="appbar"><span class="brand"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></span><a class="toplink" href="#" onclick="logout();return false;">Sair</a></div>
+    <div class="content">
+      <div class="celebrate" aria-hidden="true">🎉</div>
+      <h1 id="titulo">Parabéns!<br>Você foi aprovado(a)</h1>
+      <p class="lead">Inicie o envio de documentos (pré-onboarding) para completar sua documentação.</p>
+      <p class="reassure">Comece com o que você tem — a gente te orienta o resto.</p>
+      <div id="status-jornada"></div>
+      <a class="btn-primary" href="/candidato-checklist.html" id="cta">Iniciar envio de documentos</a>
+      <div class="footer" id="prazo"></div>
+    </div>
+    <a class="assist" href="mailto:rh@empresa.com">Precisa de ajuda para enviar? Fale com o RH</a>
+  </div>
+<script src="/app.js"></script>
+<script>
+  (async () => {
+    const u = await requirePapel('candidato');
+    if (!u) return;
+    document.getElementById('titulo').innerHTML = `Parabéns, ${esc(u.nome.split(' ')[0])}!<br>Você foi aprovado(a)`;
+
+    const { progresso, jornada } = await api('/jornada');
+    const cta = document.getElementById('cta');
+    if (progresso.enviados > 0 && progresso.aprovados < progresso.total) {
+      cta.textContent = `Continuar envio (${progresso.enviados} de ${progresso.total} enviados)`;
+    }
+    if (progresso.aprovados === progresso.total) {
+      cta.textContent = 'Ver confirmação';
+      cta.href = '/candidato-concluido.html';
+      document.getElementById('status-jornada').innerHTML =
+        `<div class="alert alert-success congrats-done">Tudo aprovado! Sua documentação está pronta para admissão.</div>`;
+    }
+    if (jornada.prazo_recomendado) {
+      const d = new Date(jornada.prazo_recomendado + 'T12:00:00');
+      document.getElementById('prazo').textContent =
+        `Envie em até ${d.toLocaleDateString('pt-BR')}. É uma recomendação — se precisar de mais tempo, a gente te ajuda.`;
+    }
+  })();
+</script>
+</body>
+</html>

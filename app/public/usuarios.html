@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Usuários</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--surface-raised);border-bottom:1px solid var(--border-hairline);gap:12px;}
+  .usermenu{font-size:13px;color:var(--ink-secondary);display:flex;gap:14px;align-items:center;}
+  .main{padding:20px 24px;}
+  .grid{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+  @media (max-width:900px){.grid{grid-template-columns:1fr;}}
+  .card{background:var(--surface-raised);border:1px solid var(--border-hairline);border-radius:12px;padding:18px;}
+  .card h2{font-size:15px;font-weight:600;margin-bottom:14px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-secondary);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-hairline);}
+  td{padding:10px;border-bottom:1px solid var(--border-hairline);vertical-align:middle;}
+  tr.inativo td{color:var(--ink-secondary);background:var(--surface-base);}
+  .mini{font-size:12px;min-height:32px;padding:5px 9px;border-radius:7px;border:1px solid var(--border-hairline);background:#fff;cursor:pointer;}
+  .mini.danger{color:var(--danger);}
+  .mini.ok{color:var(--success);}
+  .acoes{display:flex;gap:6px;flex-wrap:wrap;}
+  #erro,#ok{display:none;margin:0 0 12px;}
+  .papel-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:9999px;background:var(--surface-sunken);color:var(--ink-secondary);text-transform:uppercase;letter-spacing:.03em;}
+  .papel-badge.rh{background:rgba(31,111,235,.1);color:var(--primary);}
+  #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink-primary);color:#fff;
+    font-size:13px;padding:10px 16px;border-radius:8px;display:none;z-index:20;}
+</style>
+</head>
+<body class="stage-desktop">
+  <div class="browser">
+    <div class="chrome"><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      <span class="url">onboarding.gci.com.br/rh/usuarios</span></div>
+    <div class="topbar">
+      <a class="brand" href="/rh-revisao.html"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></a>
+      <div class="usermenu">
+        <a class="toplink" href="/rh-revisao.html">← Fila de candidatos</a>
+        <span id="quem"></span>
+        <a class="toplink" href="#" onclick="logout();return false;">Sair</a>
+      </div>
+    </div>
+    <div class="main">
+      <div class="grid">
+        <div class="card">
+          <h2>Novo usuário</h2>
+          <div class="alert alert-danger" id="erro" role="alert"></div>
+          <div class="alert alert-success" id="ok" role="status"></div>
+          <form id="form-criar">
+            <div class="field"><label for="nome">Nome completo</label><input id="nome" required placeholder="Ex.: Ana Ribeiro"></div>
+            <div class="field"><label for="email">E-mail</label><input id="email" type="email" required placeholder="ana@exemplo.com"></div>
+            <div class="field"><label for="papel">Papel</label>
+              <select id="papel">
+                <option value="candidato">Candidato (cria jornada + checklist)</option>
+                <option value="rh">RH (acesso ao painel)</option>
+              </select></div>
+            <div class="field" id="contrato-wrap"><label for="tipo_contrato">Tipo de contrato</label>
+              <select id="tipo_contrato">
+                <option value="CLT">CLT (18 documentos)</option>
+                <option value="ESTAGIO">Estágio (14 documentos)</option>
+                <option value="PJ">PJ — CNPJ (8 documentos)</option>
+              </select>
+              <div class="hint">Define o checklist de documentos do candidato.</div></div>
+            <div class="field" id="acesso-wrap"><label for="acesso">Forma de acesso</label>
+              <select id="acesso">
+                <option value="link">Link de convite — sem senha (recomendado)</option>
+                <option value="senha">Senha definida por mim</option>
+              </select>
+              <div class="hint" id="acesso-hint">Gera um link para você enviar ao candidato. Válido por 7 dias, uso único.</div></div>
+            <div class="field" id="cpf-wrap"><label for="cpf">CPF (opcional)</label><input id="cpf" inputmode="numeric" placeholder="000.000.000-00">
+              <div class="hint">Se informado, o candidato confirma o CPF ao abrir o link.</div></div>
+            <div class="field" id="senha-wrap" style="display:none;"><label for="senha">Senha inicial</label><input id="senha" type="text" minlength="6" placeholder="mín. 6 caracteres">
+              <div class="hint">Informe a senha do primeiro acesso.</div></div>
+            <button class="btn-primary" type="submit" id="btn-criar">Criar candidato e gerar link</button>
+          </form>
+          <div id="link-criado" style="display:none;margin-top:16px;padding:14px;background:var(--success-soft);border-radius:10px;">
+            <label style="font-size:13px;font-weight:700;display:block;margin-bottom:8px;color:var(--success);">Link de acesso — envie ao candidato</label>
+            <div style="display:flex;gap:6px;">
+              <input id="link-input" readonly style="flex:1;min-height:40px;padding:8px 10px;border:1px solid var(--border-hairline);border-radius:8px;font-size:12px;background:#fff;">
+              <button class="mini" type="button" id="copiar-link" style="min-height:40px;">Copiar</button>
+            </div>
+            <div class="acoes" style="margin-top:8px;">
+              <a class="mini" id="enviar-whats" target="_blank" rel="noopener">Enviar por WhatsApp</a>
+              <a class="mini" id="enviar-email">Enviar por e-mail</a>
+            </div>
+            <div class="hint" style="margin-top:6px;">Válido por 7 dias, uso único. Renovar gera um novo link e invalida o anterior.</div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Usuários</h2>
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Papel</th><th>Status</th><th></th></tr></thead>
+            <tbody id="lista"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="toast" role="status"></div>
+
+<script src="/app.js"></script>
+<script>
+  let eu = null;
+  const toast = (msg) => {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 2200);
+  };
+
+  async function carregar() {
+    const { usuarios } = await api('/usuarios');
+    document.getElementById('lista').innerHTML = usuarios.map((u) => `
+      <tr class="${u.ativo ? '' : 'inativo'}">
+        <td><strong>${esc(u.nome)}</strong></td>
+        <td>${esc(u.email)}</td>
+        <td><span class="papel-badge ${u.papel}">${u.papel === 'rh' ? 'RH' : 'Candidato'}</span></td>
+        <td>${u.ativo ? 'Ativo' : 'Desativado'}${u.papel === 'candidato' ? `<br><span class="hint">${u.convite_status === 'ativo' ? 'link ativo' : 'sem link'}</span>` : ''}</td>
+        <td><div class="acoes">
+          <button class="mini" data-acao="editar" data-id="${u.id}">Editar</button>
+          <button class="mini" data-acao="senha" data-id="${u.id}">Resetar senha</button>
+          ${u.papel === 'candidato' ? `<button class="mini" data-acao="convite" data-id="${u.id}" data-nome="${esc(u.nome)}">${u.convite_status === 'ativo' ? 'Renovar link' : 'Gerar link'}</button>` : ''}
+          ${u.id !== eu.id ? `<button class="mini ${u.ativo ? 'danger' : 'ok'}" data-acao="toggle" data-id="${u.id}" data-ativo="${u.ativo}">${u.ativo ? 'Desativar' : 'Reativar'}</button>` : ''}
+        </div></td>
+      </tr>`).join('');
+
+    document.querySelectorAll('[data-acao]').forEach((b) =>
+      b.addEventListener('click', () => acao(b.dataset.acao, Number(b.dataset.id), b)));
+  }
+
+  function mostrarLink(link, nome = '') {
+    const wrap = document.getElementById('link-criado');
+    document.getElementById('link-input').value = link;
+
+    const saudacao = nome ? `Olá, ${nome.split(' ')[0]}! ` : 'Olá! ';
+    const texto = `${saudacao}Bem-vindo(a) à GCI. Acesse o link para enviar seus documentos de admissão: ${link}`;
+    document.getElementById('enviar-whats').href = `https://wa.me/?text=${encodeURIComponent(texto)}`;
+    document.getElementById('enviar-email').href =
+      `mailto:?subject=${encodeURIComponent('Onboarding — envio de documentos')}&body=${encodeURIComponent(texto)}`;
+
+    wrap.style.display = 'block';
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function copiar(texto) {
+    try { await navigator.clipboard.writeText(texto); toast('Link copiado!'); }
+    catch {
+      const inp = document.getElementById('link-input');
+      inp.select(); document.execCommand('copy'); toast('Link copiado!');
+    }
+  }
+
+  document.getElementById('copiar-link').addEventListener('click', () =>
+    copiar(document.getElementById('link-input').value));
+
+  async function acao(tipo, id, btn) {
+    try {
+      if (tipo === 'editar') {
+        const nome = prompt('Novo nome (deixe vazio para manter):');
+        const email = prompt('Novo e-mail (deixe vazio para manter):');
+        const cpf = prompt('CPF para confirmar no link (deixe vazio para manter/remover):');
+        const body = {};
+        if (nome?.trim()) body.nome = nome.trim();
+        if (email?.trim()) body.email = email.trim();
+        if (cpf !== null) body.cpf = cpf.trim();
+        if (Object.keys(body).length === 0) return;
+        await api(`/usuarios/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+        toast('Usuário atualizado.');
+      } else if (tipo === 'convite') {
+        const { link } = await api(`/usuarios/${id}/convite`, { method: 'POST' });
+        mostrarLink(link, btn.dataset.nome || '');
+        await copiar(link);
+      } else if (tipo === 'senha') {
+        const senha = prompt('Nova senha (mín. 6 caracteres):');
+        if (!senha) return;
+        await api(`/usuarios/${id}`, { method: 'PATCH', body: JSON.stringify({ senha }) });
+        toast('Senha redefinida.');
+      } else if (tipo === 'toggle') {
+        const ativar = btn.dataset.ativo !== '1';
+        if (!ativar && !confirm('Desativar este usuário? Ele perde o acesso imediatamente.')) return;
+        await api(`/usuarios/${id}`, { method: 'PATCH', body: JSON.stringify({ ativo: ativar }) });
+        toast(ativar ? 'Usuário reativado.' : 'Usuário desativado.');
+      }
+      await carregar();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  function ajustarForm() {
+    const cand = document.getElementById('papel').value === 'candidato';
+    const porLink = cand && document.getElementById('acesso').value === 'link';
+
+    document.getElementById('contrato-wrap').style.display = cand ? 'block' : 'none';
+    document.getElementById('acesso-wrap').style.display = cand ? 'block' : 'none';
+    document.getElementById('cpf-wrap').style.display = porLink ? 'block' : 'none';
+    document.getElementById('senha-wrap').style.display = porLink ? 'none' : 'block';
+    document.getElementById('senha').required = !porLink;
+    document.getElementById('btn-criar').textContent = porLink
+      ? 'Criar candidato e gerar link'
+      : cand ? 'Criar candidato' : 'Criar usuário do RH';
+  }
+
+  document.getElementById('papel').addEventListener('change', ajustarForm);
+  document.getElementById('acesso').addEventListener('change', ajustarForm);
+
+  document.getElementById('form-criar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const erro = document.getElementById('erro');
+    const ok = document.getElementById('ok');
+    erro.style.display = 'none'; ok.style.display = 'none';
+    try {
+      const papel = document.getElementById('papel').value;
+      const porLink = papel === 'candidato' && document.getElementById('acesso').value === 'link';
+      const nome = document.getElementById('nome').value;
+      const { link } = await api('/usuarios', {
+        method: 'POST',
+        body: JSON.stringify({
+          nome,
+          email: document.getElementById('email').value,
+          senha: porLink ? undefined : document.getElementById('senha').value,
+          papel,
+          cpf: porLink ? document.getElementById('cpf').value || undefined : undefined,
+          tipo_contrato: document.getElementById('tipo_contrato').value,
+        }),
+      });
+      ok.textContent = papel === 'candidato'
+        ? 'Candidato criado! Jornada montada' + (link ? ' — envie o link abaixo.' : '.')
+        : 'Usuário de RH criado!';
+      ok.style.display = 'block';
+      if (link) mostrarLink(link, nome);
+      e.target.reset();
+      ajustarForm();
+      await carregar();
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  });
+
+  (async () => {
+    eu = await requirePapel('rh');
+    if (!eu) return;
+    document.getElementById('quem').textContent = `${eu.nome.split(' ')[0]} · RH`;
+    ajustarForm();
+    await carregar();
+  })();
+</script>
+</body>
+</html>

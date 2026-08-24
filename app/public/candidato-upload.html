@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Documento</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .content{padding:16px 20px 24px;}
+  .preview{border:2px dashed var(--border-hairline);border-radius:12px;min-height:110px;
+    display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;
+    color:var(--ink-secondary);font-size:14px;margin-bottom:16px;padding:16px;text-align:center;
+    background:var(--surface-raised);cursor:pointer;}
+  .preview:hover{border-color:var(--accent);}
+  .preview img{max-width:100%;max-height:180px;border-radius:8px;}
+  .file-name{font-size:13px;color:var(--link);font-weight:600;word-break:break-all;}
+  .returned-banner{background:var(--danger-soft);border-radius:12px;padding:14px 16px;margin-bottom:16px;}
+  .rb-title{font-size:14px;font-weight:700;color:var(--danger);}
+  .rb-reason{font-size:13px;color:var(--danger);margin-top:4px;}
+  .rb-tips{font-size:12px;color:var(--ink-secondary);margin-top:8px;line-height:1.5;}
+  .aviso-sus{display:none;background:var(--warning-soft);color:var(--warning);border-radius:10px;
+    padding:10px 12px;font-size:12px;line-height:1.5;margin-top:6px;}
+  #erro,#ok{display:none;}
+  .actions{margin-top:16px;}
+  .dica{padding:0 20px;font-size:13px;color:var(--link);margin-top:6px;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="appbar"><span class="brand"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></span><a class="toplink" href="#" onclick="logout();return false;">Sair</a></div>
+    <div class="crumb">Envio de documentos › Documento</div>
+    <h1 id="titulo">Documento</h1>
+    <div class="dica" id="dica"></div>
+    <div class="pad" id="banner-wrap"></div>
+    <div class="content">
+      <div class="alert alert-danger" id="erro" role="alert"></div>
+      <div class="alert alert-success" id="ok" role="status"></div>
+
+      <div id="arquivo-wrap">
+        <label class="preview" for="arquivo" id="preview">
+          <span style="font-size:28px;" aria-hidden="true">📷</span>
+          <span id="preview-texto">Toque para fotografar ou escolher o arquivo</span>
+        </label>
+        <input type="file" id="arquivo" accept="image/jpeg,image/png,application/pdf" capture="environment" hidden>
+      </div>
+
+      <div id="campos"></div>
+
+      <div class="actions">
+        <button class="btn-primary" type="button" id="enviar">Enviar</button>
+        <a class="btn-secondary" href="/candidato-checklist.html">Voltar ao checklist</a>
+      </div>
+    </div>
+    <a class="assist" href="mailto:rh@empresa.com">Precisa de ajuda para enviar? Fale com o RH</a>
+  </div>
+<script src="/app.js"></script>
+<script>
+  let doc = null;
+  const tipo = new URLSearchParams(location.search).get('tipo');
+
+  const MASCARAS = {
+    cpf: (v) => v.replace(/\D/g, '').slice(0, 11)
+      .replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})$/, '$1-$2'),
+    cnpj: (v) => v.replace(/\D/g, '').slice(0, 14)
+      .replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d{1,2})$/, '$1-$2'),
+    cep: (v) => v.replace(/\D/g, '').slice(0, 8).replace(/(\d{5})(\d{1,3})$/, '$1-$2'),
+    telefone: (v) => v.replace(/\D/g, '').slice(0, 11)
+      .replace(/(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d{1,4})$/, '$1-$2'),
+  };
+
+  function campoHtml(c) {
+    const oculto = c.condicional ? 'style="display:none;"' : '';
+    const req = c.obrigatorio === false ? '' : ' data-req="1"';
+    const mask = c.mascara ? ` data-mascara="${c.mascara}"` : '';
+    const sus = c.validacao === 'sus' ? ' data-sus="1"' : '';
+    const cond = c.condicional ? ` data-cond-key="${c.condicional.key}" data-cond-valor="${c.condicional.igual}"` : '';
+    if (c.tipo === 'select') {
+      const opts = c.opcoes.map((o) => `<option value="${esc(o)}">${esc(o === 'sim' ? 'Sim' : o === 'nao' ? 'Não' : o)}</option>`).join('');
+      return `<div class="field" ${oculto}${cond}><label for="f-${c.key}">${esc(c.label)}</label>
+        <select id="f-${c.key}" data-key="${c.key}"${req}>${opts}</select></div>`;
+    }
+    const inputType = c.tipo === 'date' ? 'date' : c.tipo === 'numero' ? 'number' : 'text';
+    return `<div class="field" ${oculto}${cond}><label for="f-${c.key}">${esc(c.label)}</label>
+      <input id="f-${c.key}" type="${inputType}" data-key="${c.key}"${req}${mask}${sus}>
+      ${c.validacao === 'sus' ? `<div class="aviso-sus" id="aviso-sus">${esc(doc.aviso_sus)}</div>` : ''}
+    </div>`;
+  }
+
+  function dadosDoForm() {
+    const dados = {};
+    document.querySelectorAll('#campos [data-key]').forEach((el) => {
+      const wrap = el.closest('.field');
+      if (wrap && wrap.style.display === 'none') return;
+      const v = el.value.trim();
+      if (v !== '') dados[el.dataset.key] = v;
+    });
+    return dados;
+  }
+
+  function atualizarCondicionais() {
+    document.querySelectorAll('#campos [data-cond-key]').forEach((wrap) => {
+      const fonte = document.querySelector(`#campos [data-key="${wrap.dataset.condKey}"]`);
+      const mostrar = fonte && fonte.value === wrap.dataset.condValor;
+      wrap.style.display = mostrar ? 'block' : 'none';
+    });
+    if (doc.arquivo === 'condicional' && doc.condicional_arquivo) {
+      const fonte = document.querySelector(`#campos [data-key="${doc.condicional_arquivo.key}"]`);
+      const mostrar = fonte && fonte.value === doc.condicional_arquivo.igual;
+      document.getElementById('arquivo-wrap').style.display = mostrar ? 'block' : 'none';
+    }
+  }
+
+  function validarSus() {
+    const el = document.querySelector('#campos [data-sus="1"]');
+    if (!el) return true;
+    const v = el.value.replace(/\D/g, '');
+    const ok = v === '' || v.startsWith('7') || v.startsWith('8');
+    document.getElementById('aviso-sus').style.display = ok ? 'none' : 'block';
+    return ok;
+  }
+
+  (async () => {
+    const u = await requirePapel('candidato');
+    if (!u) return;
+    const { checklist } = await api('/jornada');
+    doc = checklist.find((d) => d.tipo === tipo);
+    if (!doc) { location.href = '/candidato-checklist.html'; return; }
+
+    document.getElementById('titulo').textContent = doc.nome;
+    document.title = `Onboarding — ${doc.nome}`;
+    if (doc.dica) document.getElementById('dica').textContent = doc.dica;
+
+    if (doc.arquivo === 'nunca') {
+      document.getElementById('arquivo-wrap').style.display = 'none';
+      document.getElementById('enviar').textContent = 'Salvar';
+    }
+
+    document.getElementById('campos').innerHTML = doc.campos.map(campoHtml).join('');
+
+    document.querySelectorAll('#campos [data-key]').forEach((el) => {
+      el.addEventListener('change', atualizarCondicionais);
+      if (el.dataset.mascara) {
+        el.addEventListener('input', () => { el.value = MASCARAS[el.dataset.mascara](el.value); });
+      }
+      if (el.dataset.sus) el.addEventListener('input', validarSus);
+    });
+
+    if (doc.status === 'devolvido') {
+      document.getElementById('banner-wrap').innerHTML = `
+        <div class="returned-banner" role="alert">
+          <div class="rb-title">Documento devolvido</div>
+          <div class="rb-reason">${esc(textoDevolucao(doc.motivo_devolucao))}</div>
+          <div class="rb-tips">${DICAS_DEVOLUCAO}</div>
+        </div>`;
+      document.getElementById('enviar').textContent = 'Corrigir e reenviar';
+    }
+
+    for (const [k, v] of Object.entries(doc.dados || {})) {
+      const el = document.querySelector(`#campos [data-key="${k}"]`);
+      if (el) el.value = v;
+    }
+    atualizarCondicionais();
+  })();
+
+  document.getElementById('arquivo').addEventListener('change', (e) => {
+    const f = e.target.files[0];
+    const preview = document.getElementById('preview');
+    if (!f) return;
+    preview.innerHTML = '';
+    if (f.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      preview.appendChild(img);
+    } else {
+      preview.innerHTML = '<span style="font-size:28px;" aria-hidden="true">📄</span>';
+    }
+    preview.insertAdjacentHTML('beforeend', `<span class="file-name">${esc(f.name)}</span>`);
+  });
+
+  document.getElementById('enviar').addEventListener('click', async () => {
+    const erro = document.getElementById('erro');
+    const ok = document.getElementById('ok');
+    erro.style.display = 'none'; ok.style.display = 'none';
+
+    const faltando = [...document.querySelectorAll('#campos [data-req="1"]')]
+      .filter((el) => el.closest('.field').style.display !== 'none' && !el.value.trim());
+    if (faltando.length > 0) {
+      erro.textContent = `Preencha: ${faltando.map((el) => el.closest('.field').querySelector('label').textContent).join(', ')}.`;
+      erro.style.display = 'block';
+      faltando[0].focus();
+      return;
+    }
+
+    const arquivo = document.getElementById('arquivo').files[0];
+    const arquivoVisivel = document.getElementById('arquivo-wrap').style.display !== 'none';
+    if (arquivoVisivel && !arquivo && !doc.tem_arquivo && doc.arquivo !== 'nunca') {
+      erro.textContent = 'Selecione um arquivo JPG, PNG ou PDF antes de enviar.';
+      erro.style.display = 'block';
+      return;
+    }
+
+    const fd = new FormData();
+    if (arquivo) fd.append('arquivo', arquivo);
+    fd.append('dados', JSON.stringify(dadosDoForm()));
+
+    const btn = document.getElementById('enviar');
+    const rotulo = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Enviando...';
+    try {
+      const res = await fetch(`/api/documentos/${tipo}/upload`, { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.erro || 'Falha no envio.');
+      ok.textContent = 'Enviado! Seu documento entrou em validação.';
+      ok.style.display = 'block';
+      setTimeout(() => { location.href = '/candidato-checklist.html'; }, 900);
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+      btn.disabled = false; btn.textContent = rotulo;
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Envio concluído</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .content{padding:16px 20px 32px;}
+  .celebrate{font-size:48px;margin:20px 0 12px;text-align:center;}
+  h1{font-size:24px;line-height:1.25;padding:0;text-align:center;}
+  .lead{font-size:15px;color:var(--ink-secondary);margin-top:12px;line-height:1.6;text-align:center;}
+  .resumo{margin:20px 0;background:var(--surface-raised);border:1px solid var(--border-hairline);
+    border-radius:12px;padding:14px 16px;font-size:13px;color:var(--ink-secondary);line-height:1.7;}
+  .resumo strong{color:var(--ink-primary);}
+  .footer{font-size:12px;color:var(--ink-secondary);margin-top:18px;text-align:center;line-height:1.5;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="appbar"><span class="brand"><img src="/assets/logo-gci.png" alt="GCI"><small>Onboarding</small></span><a class="toplink" href="#" onclick="logout();return false;">Sair</a></div>
+    <div class="content">
+      <div class="celebrate" aria-hidden="true">💚</div>
+      <h1 id="titulo">Obrigado pelo envio!</h1>
+      <p class="lead">Recebemos seus documentos e agradecemos a dedicação em completar esta etapa.</p>
+      <div class="resumo" id="resumo"></div>
+      <p class="lead" id="validacao"></p>
+      <a class="btn-primary" href="/candidato-checklist.html" style="margin-top:20px;">Acompanhar meu progresso</a>
+      <div class="footer">Se algo precisar de correção, você recebe o aviso aqui mesmo, com o passo a passo para ajustar.</div>
+    </div>
+    <a class="assist" href="mailto:rh@empresa.com">Precisa de ajuda? Fale com o RH</a>
+  </div>
+<script src="/app.js"></script>
+<script>
+  (async () => {
+    const u = await requirePapel('candidato');
+    if (!u) return;
+    document.getElementById('titulo').textContent = `Obrigado, ${u.nome.split(' ')[0]}!`;
+
+    const { progresso } = await api('/jornada');
+    document.getElementById('resumo').innerHTML =
+      `<strong>${progresso.enviados} de ${progresso.total}</strong> documentos enviados · ` +
+      `<strong>${progresso.aprovados}</strong> já validados pelo RH`;
+
+    document.getElementById('validacao').textContent = progresso.aprovados === progresso.total
+      ? 'Tudo validado! Sua documentação está completa e segue para a admissão. Obrigado por concluir sua jornada com a GCI.'
+      : 'Seus documentos agora passam pela validação do nosso time de RH. Agradecemos a confiança — avisaremos assim que a validação for concluída.';
+  })();
+</script>
+</body>
+</html>

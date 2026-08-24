@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Seu acesso</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .content{padding:8px 20px 32px;}
+  .marca{display:flex;flex-direction:column;align-items:center;gap:14px;margin:20px 0 22px;text-align:center;}
+  .marca h1{font-size:24px;padding:0;}
+  .lead{font-size:14px;color:var(--ink-secondary);margin-bottom:20px;line-height:1.5;text-align:center;}
+  #erro,#cpf-wrap{display:none;}
+  .central{display:flex;flex-direction:column;align-items:center;gap:12px;padding:24px 0;text-align:center;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="content">
+      <div class="marca">
+        <img class="brand-mark" src="/assets/logo-mark.png" alt="GCI — Grupo Consultoria Integrada">
+        <h1>Onboarding</h1>
+      </div>
+
+      <div id="carregando" class="central"><p class="lead">Verificando seu link...</p></div>
+
+      <div id="acesso" style="display:none;">
+        <p class="lead" id="saudacao"></p>
+        <div class="alert alert-danger" id="erro" role="alert"></div>
+        <div class="field" id="cpf-wrap">
+          <label for="cpf">Confirme seu CPF</label>
+          <input id="cpf" inputmode="numeric" placeholder="000.000.000-00" maxlength="14">
+          <div class="hint">É uma confirmação de segurança — só os números bastam.</div>
+        </div>
+        <button class="btn-primary" type="button" id="entrar">Acessar minha jornada</button>
+      </div>
+
+      <div id="invalido" style="display:none;" class="central">
+        <span style="font-size:40px;" aria-hidden="true">🔗</span>
+        <p class="lead" id="motivo-invalido">Este link expirou ou já foi utilizado.</p>
+        <a class="btn-secondary" href="mailto:rh@empresa.com">Pedir um novo link ao RH</a>
+      </div>
+    </div>
+  </div>
+<script src="/app.js"></script>
+<script>
+  const token = new URLSearchParams(location.search).get('token') || '';
+  let pedeCpf = false;
+
+  (async () => {
+    const u = await me();
+    if (u?.papel === 'candidato') { location.href = '/candidato-aprovacao.html'; return; }
+
+    document.getElementById('carregando').style.display = 'none';
+    if (!token) return mostrarInvalido('Link incompleto. Peça um novo link ao RH.');
+
+    try {
+      const res = await fetch(`/api/convite/${encodeURIComponent(token)}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.erro);
+      pedeCpf = data.pede_cpf;
+      document.getElementById('saudacao').textContent =
+        `Olá, ${data.nome}! Toque em acessar para iniciar o envio dos seus documentos.`;
+      if (pedeCpf) document.getElementById('cpf-wrap').style.display = 'block';
+      document.getElementById('acesso').style.display = 'block';
+    } catch (err) {
+      mostrarInvalido(err.message);
+    }
+  })();
+
+  function mostrarInvalido(msg) {
+    document.getElementById('carregando').style.display = 'none';
+    document.getElementById('acesso').style.display = 'none';
+    document.getElementById('motivo-invalido').textContent = msg;
+    document.getElementById('invalido').style.display = 'flex';
+  }
+
+  document.getElementById('cpf').addEventListener('input', (e) => {
+    const v = e.target.value.replace(/\D/g, '').slice(0, 11);
+    e.target.value = v.replace(/(\d{3})(\d{3})?(\d{3})?(\d{1,2})?/, (m, a, b, c, d) =>
+      [a, b, c].filter(Boolean).join('.') + (d ? '-' + d : ''));
+  });
+
+  document.getElementById('entrar').addEventListener('click', async () => {
+    const erro = document.getElementById('erro');
+    erro.style.display = 'none';
+    try {
+      await api('/convite', {
+        method: 'POST',
+        body: JSON.stringify({ token, cpf: document.getElementById('cpf').value }),
+      });
+      location.href = '/candidato-aprovacao.html';
+    } catch (err) {
+      if (/expirado|utilizado/i.test(err.message)) return mostrarInvalido(err.message);
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+    }
+  });
+</script>
+</body>
+</html>

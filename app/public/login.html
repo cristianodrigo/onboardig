@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Onboarding — Entrar</title>
+<link rel="icon" href="/assets/logo-mark.png" type="image/png">
+<link rel="stylesheet" href="/app.css">
+<style>
+  .content{padding:8px 20px 32px;}
+  .marca{display:flex;flex-direction:column;align-items:center;gap:14px;margin:20px 0 24px;text-align:center;}
+  .logo-completo{display:block;width:234px;max-width:100%;height:auto;object-fit:contain;}
+  .marca h1{font-size:24px;padding:0;}
+  .lead{font-size:14px;color:var(--ink-secondary);margin-bottom:20px;line-height:1.5;text-align:center;}
+  .demo{font-size:12px;color:var(--ink-secondary);background:var(--surface-sunken);
+    border-radius:10px;padding:10px 12px;margin-top:18px;line-height:1.6;}
+  .demo code{background:#fff;padding:1px 5px;border-radius:4px;}
+  #erro{display:none;}
+</style>
+</head>
+<body class="stage-mobile">
+  <div class="phone">
+    <div class="status-bar"></div>
+    <div class="content">
+      <div class="marca">
+        <img class="logo-completo" src="/assets/logo-gci.png" alt="GCI — Grupo Consultoria Integrada">
+        <h1>Onboarding</h1>
+      </div>
+      <p class="lead">Envio de documentos (pré-onboarding) — acesse sua jornada ou o painel do RH.</p>
+      <div class="alert alert-danger" id="erro" role="alert"></div>
+      <form id="form">
+        <div class="field">
+          <label for="email">E-mail</label>
+          <input id="email" type="email" required autocomplete="username" placeholder="voce@exemplo.com">
+        </div>
+        <div class="field">
+          <label for="senha">Senha</label>
+          <input id="senha" type="password" required autocomplete="current-password" placeholder="Sua senha">
+        </div>
+        <button class="btn-primary" type="submit" id="btn">Entrar</button>
+      </form>
+      <div class="demo">
+        <strong>Credenciais de demonstração</strong><br>
+        RH: <code>renata@empresa.com</code> / <code>admin123</code><br>
+        Candidata: <code>marina@exemplo.com</code> / <code>senha123</code>
+      </div>
+    </div>
+  </div>
+<script src="/app.js"></script>
+<script>
+  (async () => {
+    const u = await me();
+    if (u) location.href = u.papel === 'rh' ? '/rh-revisao.html' : '/candidato-aprovacao.html';
+  })();
+
+  document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const erro = document.getElementById('erro');
+    const btn = document.getElementById('btn');
+    erro.style.display = 'none';
+    btn.disabled = true; btn.textContent = 'Entrando...';
+    try {
+      const { usuario } = await api('/login', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: document.getElementById('email').value,
+          senha: document.getElementById('senha').value,
+        }),
+      });
+      location.href = usuario.papel === 'rh' ? '/rh-revisao.html' : '/candidato-aprovacao.html';
+    } catch (err) {
+      erro.textContent = err.message;
+      erro.style.display = 'block';
+      btn.disabled = false; btn.textContent = 'Entrar';
+    }
+  });
+</script>
+</body>
+</html>
