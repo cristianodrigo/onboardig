@@ -50,6 +50,14 @@
   .modal-back.open{display:flex;}
   .modal{background:#fff;border-radius:14px;width:440px;max-width:100%;padding:20px;}
   .modal h3{font-size:16px;margin-bottom:12px;}
+  .modal-view{width:min(960px,100%);max-height:90vh;display:flex;flex-direction:column;padding:16px 16px 12px;}
+  .view-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px;}
+  .view-head h3{margin:0;font-size:16px;}
+  .view-frame{flex:1;min-height:420px;max-height:calc(90vh - 140px);border:1px solid var(--border-hairline);border-radius:10px;background:#eef2f6;overflow:auto;display:flex;align-items:center;justify-content:center;}
+  .view-frame img{max-width:100%;max-height:calc(90vh - 160px);object-fit:contain;}
+  .view-frame iframe{width:100%;height:calc(90vh - 160px);border:0;background:#fff;}
+  .view-erro{padding:24px;color:var(--danger);font-size:14px;text-align:center;}
+  .view-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;justify-content:flex-end;}
   .motivos label{display:flex;align-items:center;gap:8px;font-size:14px;padding:6px 0;}
   .empty{padding:40px;color:var(--ink-secondary);font-size:14px;text-align:center;flex:1;}
   #toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink-primary);color:#fff;
@@ -94,6 +102,17 @@
     </div>
   </div>
 
+  <div class="modal-back" id="modal-visualizar">
+    <div class="modal modal-view" role="dialog" aria-modal="true" aria-labelledby="view-title">
+      <div class="view-head">
+        <h3 id="view-title">Documento</h3>
+        <button class="btn btn-o" type="button" id="view-fechar">Fechar</button>
+      </div>
+      <div class="view-frame" id="view-frame"></div>
+      <div class="view-actions" id="view-actions"></div>
+    </div>
+  </div>
+
   <div id="toast" role="status"></div>
 
 <script src="/app.js"></script>
@@ -102,6 +121,9 @@
   let selecionado = null;   // jornada_id
   let detalhe = null;
   let devolverIds = [];
+  let visualizarDocId = null;
+  let visualizarObjectUrl = null;
+  let visualizarSeq = 0;
 
   const toast = (msg) => {
     const t = document.getElementById('toast');
@@ -153,14 +175,15 @@
     const podeRevisar = d.status === 'em_revisao';
     const devol = d.status === 'devolvido'
       ? `<div class="motivo">${esc(textoDevolucao(d.motivo_devolucao))}</div>` : '';
-    const baixar = d.tem_arquivo
-      ? `<a class="mini" href="/api/documentos/${d.id}/arquivo">Baixar</a>` : '';
+    const ver = d.tem_arquivo
+      ? `<button class="mini" data-acao="visualizar" data-id="${d.id}">Visualizar</button>
+         <a class="mini" href="/api/documentos/${d.id}/arquivo">Baixar</a>` : '';
     const acoes = podeRevisar
       ? `<button class="mini approve" data-acao="aprovar" data-id="${d.id}">Aprovar</button>
-         <button class="mini return" data-acao="devolver" data-id="${d.id}">Devolver</button>${baixar}
+         <button class="mini return" data-acao="devolver" data-id="${d.id}">Devolver</button>${ver}
          <button class="mini" data-acao="corrigir" data-id="${d.id}">Corrigir cadastro</button>
          <label title="Selecionar para ação em massa"><input type="checkbox" class="sel" data-id="${d.id}"></label>`
-      : baixar;
+      : ver;
     return `<article class="doc-card">
       <div class="thumb" aria-hidden="true">${d.icone}</div>
       <div class="doc-info">
@@ -211,9 +234,12 @@
     if (acao === 'aprovar') {
       await api(`/documentos/${docId}/aprovar`, { method: 'POST' });
       toast('Documento aprovado.');
+      limparVisualizar();
       await abrirCandidato(selecionado); await carregarFila();
     } else if (acao === 'devolver') {
       abrirModalDevolucao([docId]);
+    } else if (acao === 'visualizar') {
+      await abrirVisualizar(docId);
     } else if (acao === 'corrigir') {
       const novoNome = prompt('Corrigir nome do cadastro:', detalhe.candidato.nome);
       if (novoNome && novoNome.trim() && novoNome.trim() !== detalhe.candidato.nome) {
@@ -224,6 +250,91 @@
     }
   }
 
+  function ehImagem(nome) {
+    return /\.(jpe?g|png)$/i.test(nome || '');
+  }
+
+  function limparVisualizar() {
+    visualizarSeq += 1;
+    if (visualizarObjectUrl) {
+      URL.revokeObjectURL(visualizarObjectUrl);
+      visualizarObjectUrl = null;
+    }
+    visualizarDocId = null;
+    document.getElementById('view-frame').innerHTML = '';
+    document.getElementById('view-actions').innerHTML = '';
+    document.getElementById('modal-visualizar').classList.remove('open');
+  }
+
+  function montarAcoesVisualizar(doc, carregou) {
+    const podeRevisar = carregou && doc.status === 'em_revisao';
+    document.getElementById('view-actions').innerHTML =
+      `<a class="mini" href="/api/documentos/${doc.id}/arquivo">Baixar</a>` +
+      (podeRevisar
+        ? `<button class="mini return" type="button" id="view-devolver">Devolver</button>
+           <button class="mini approve" type="button" id="view-aprovar">Aprovar</button>`
+        : '');
+    document.getElementById('view-aprovar')?.addEventListener('click', () => {
+      acaoDoc('aprovar', doc.id).catch((err) => toast(err.message || 'Falha ao aprovar.'));
+    });
+    document.getElementById('view-devolver')?.addEventListener('click', () => {
+      abrirModalDevolucao([doc.id]);
+    });
+  }
+
+  async function abrirVisualizar(docId) {
+    const doc = (detalhe?.documentos || []).find((d) => d.id === docId);
+    if (!doc?.tem_arquivo) return;
+    const seq = ++visualizarSeq;
+    visualizarDocId = docId;
+    const titulo = doc.nome || 'Documento';
+    document.getElementById('view-title').textContent = titulo;
+    const frame = document.getElementById('view-frame');
+    frame.innerHTML = '<div class="view-erro">Carregando documento…</div>';
+    document.getElementById('view-actions').innerHTML = '';
+    document.getElementById('modal-visualizar').classList.add('open');
+
+    try {
+      const res = await fetch(`/api/documentos/${docId}/arquivo?inline=1`, { credentials: 'same-origin' });
+      if (seq !== visualizarSeq) return;
+      if (res.status === 401) { location.href = '/login.html'; return; }
+      if (!res.ok) {
+        const msg = res.status === 404 ? 'Arquivo não encontrado.'
+          : res.status === 403 ? 'Sem acesso a este arquivo.'
+          : 'Não foi possível abrir o documento.';
+        throw new Error(msg);
+      }
+      const tipo = (res.headers.get('content-type') || '').split(';')[0].trim();
+      if (tipo.includes('json')) throw new Error('Não foi possível abrir o documento.');
+      const blob = await res.blob();
+      if (seq !== visualizarSeq) return;
+      if (!blob.size) throw new Error('Arquivo vazio ou corrompido.');
+      if (visualizarObjectUrl) URL.revokeObjectURL(visualizarObjectUrl);
+      visualizarObjectUrl = URL.createObjectURL(blob);
+      const nome = doc.arquivo_nome || '';
+      if (ehImagem(nome) || tipo.startsWith('image/')) {
+        frame.innerHTML = `<img src="${visualizarObjectUrl}" alt="${esc(titulo)}">`;
+      } else {
+        frame.innerHTML = `<iframe title="${esc(titulo)}" src="${visualizarObjectUrl}"></iframe>`;
+      }
+      montarAcoesVisualizar(doc, true);
+    } catch (err) {
+      if (seq !== visualizarSeq) return;
+      frame.innerHTML = `<div class="view-erro">${esc(err.message || 'Não foi possível abrir o documento.')}</div>`;
+      montarAcoesVisualizar(doc, false);
+    }
+  }
+
+  document.getElementById('view-fechar').addEventListener('click', limparVisualizar);
+  document.getElementById('modal-visualizar').addEventListener('click', (e) => {
+    if (e.target.id === 'modal-visualizar') limparVisualizar();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('modal-visualizar').classList.contains('open')) {
+      limparVisualizar();
+    }
+  });
+
   function acaoEmMassa(acao) {
     const ids = [...document.querySelectorAll('.sel:checked')].map((c) => Number(c.dataset.id));
     if (ids.length === 0) { toast('Selecione ao menos um documento em revisão.'); return; }
@@ -233,6 +344,7 @@
   }
 
   function abrirModalDevolucao(ids) {
+    limparVisualizar();
     devolverIds = ids;
     document.getElementById('dev-motivos').innerHTML = Object.entries(MOTIVOS).map(([k, v]) =>
       `<label><input type="checkbox" value="${k}"> ${v}</label>`).join('');
@@ -251,6 +363,7 @@
       api(`/documentos/${id}/devolver`, { method: 'POST', body: JSON.stringify({ motivos, comentario }) })));
     document.getElementById('modal-devolver').classList.remove('open');
     toast('Documento(s) devolvido(s) com orientação.');
+    limparVisualizar();
     await abrirCandidato(selecionado); await carregarFila();
   });
 

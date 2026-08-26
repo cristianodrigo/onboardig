@@ -125,7 +125,8 @@ router.get('/documentos/:id/arquivo', requireAuth, async (req, res) => {
     if (!ehDono && !ehRh) return res.status(403).json({ erro: 'Sem acesso a este arquivo.' });
 
     auditar(req.session.user.id, ehRh && !ehDono ? 'visualizacao' : 'download', 'documento', doc.id);
-    await sendFile(res, doc.arquivo_path, doc.arquivo_nome || 'documento');
+    const inline = req.query.inline === '1' || req.query.inline === 'true';
+    await sendFile(res, doc.arquivo_path, doc.arquivo_nome || 'documento', { inline });
   } catch (err) {
     console.error('download falhou:', err);
     if (!res.headersSent) res.status(500).json({ erro: 'Falha ao baixar o arquivo.' });

@@ -115,25 +115,63 @@ export async function fileExists(ref) {
   return fs.existsSync(ref);
 }
 
+function mimeFromName(name) {
+  const ext = path.extname(name || '').toLowerCase();
+  if (ext === '.pdf') return 'application/pdf';
+  if (ext === '.png') return 'image/png';
+  if (ext === '.jpg' || ext === '.jpeg') return 'image/jpeg';
+  return 'application/octet-stream';
+}
+
+function contentDispositionHeader(disposition, downloadName) {
+  return `${disposition}; filename="${encodeURIComponent(downloadName || 'documento')}"`;
+}
+
 /**
- * Envia o arquivo na resposta HTTP (stream Azure ou download local).
+ * Envia o arquivo na resposta HTTP (stream Azure ou disco local).
+ * disposition: 'attachment' (download) ou 'inline' (visualizar no navegador).
  */
-export async function sendFile(res, ref, downloadName) {
+const MIMES_INLINE = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+
+function pipeFileStream(res, stream) {
+  stream.on('error', (err) => {
+    console.error('leitura de arquivo falhou:', err);
+    if (!res.headersSent) res.status(500).json({ erro: 'Falha ao ler o arquivo.' });
+    else res.destroy();
+  });
+  res.on('close', () => stream.destroy());
+  stream.pipe(res);
+}
+
+export async function sendFile(res, ref, downloadName, { inline = false } = {}) {
+  const typeFromName = mimeFromName(downloadName);
+  const type = typeFromName !== 'application/octet-stream' ? typeFromName : mimeFromName(ref);
+  const disposition = inline && MIMES_INLINE.has(type) ? 'inline' : 'attachment';
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Cache-Control', 'private, no-store');
+
   if (isAzureRef(ref)) {
     if (!containerClient) throw new Error('Azure Storage não configurado.');
     const blob = containerClient.getBlockBlobClient(blobNameFromRef(ref));
     const props = await blob.getProperties();
     const download = await blob.download(0);
-    res.setHeader('Content-Type', props.contentType || 'application/octet-stream');
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(downloadName || 'documento')}"`
-    );
+    const contentType = props.contentType && props.contentType !== 'application/octet-stream'
+      ? props.contentType
+      : type;
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', contentDispositionHeader(
+      inline && MIMES_INLINE.has(contentType) ? 'inline' : 'attachment',
+      downloadName
+    ));
     if (props.contentLength != null) res.setHeader('Content-Length', props.contentLength);
-    download.readableStreamBody.pipe(res);
+    const body = download.readableStreamBody;
+    if (!body) throw new Error('Stream indisponível.');
+    pipeFileStream(res, body);
     return;
   }
-  res.download(ref, downloadName || 'documento');
+  res.setHeader('Content-Type', type);
+  res.setHeader('Content-Disposition', contentDispositionHeader(disposition, downloadName));
+  pipeFileStream(res, fs.createReadStream(ref));
 }
 
 /** URL SAS temporária (opcional, para pré-visualização). */
