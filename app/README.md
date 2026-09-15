@@ -29,14 +29,9 @@ AZURE_STORAGE_CONTAINER=documentos
 
 Blobs ficam em `candidatos/{userId}/{tipo}/{timestamp}-{arquivo}`. O download continua autenticado pela API (stream do blob).
 
-## Credenciais de demonstração
+## Primeiro acesso
 
-| Papel | E-mail | Senha |
-|---|---|---|
-| RH | renata@empresa.com | admin123 |
-| Candidata | marina@exemplo.com | senha123 |
-| Candidato | joao@exemplo.com | senha123 |
-| Candidata | carla@exemplo.com | senha123 |
+Com o banco vazio, o app cria um único usuário RH se `SEED_RH_EMAIL` e `SEED_RH_PASSWORD` estiverem no `.env`. Sem isso, a tela de login fica sem credenciais de exemplo — o RH cadastra candidatos pelo painel.
 
 ## O que funciona
 

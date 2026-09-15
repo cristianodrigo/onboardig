@@ -108,44 +108,20 @@ function seed() {
   const count = db.prepare(`SELECT COUNT(*) AS n FROM users`).get().n;
   if (count > 0) return;
 
-  const hash = (s) => bcrypt.hashSync(s, 10);
-  const insUser = db.prepare(
-    `INSERT INTO users (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)`);
+  const email = process.env.SEED_RH_EMAIL?.toLowerCase().trim();
+  const senha = process.env.SEED_RH_PASSWORD;
+  const nome = process.env.SEED_RH_NOME?.trim() || 'RH';
 
-  const rhId = insUser.run('Renata Lima', 'renata@empresa.com', hash('admin123'), 'rh').lastInsertRowid;
-  auditar(null, 'seed', 'user', rhId, null, 'rh criado');
-
-  const marinaId = insUser.run('Marina Souza dos Santos', 'marina@exemplo.com', hash('senha123'), 'candidato').lastInsertRowid;
-  const joaoId = insUser.run('João Pedro Alves', 'joao@exemplo.com', hash('senha123'), 'candidato').lastInsertRowid;
-  const carlaId = insUser.run('Carla Nunes', 'carla@exemplo.com', hash('senha123'), 'candidato').lastInsertRowid;
-
-  const jMarina = criarJornadaComChecklist(marinaId);
-  const jJoao = criarJornadaComChecklist(joaoId);
-  const jCarla = criarJornadaComChecklist(carlaId);
-
-  const setDoc = db.prepare(
-    `UPDATE documentos SET status = ?, dados_json = ?, motivo_devolucao = ?, enviado_em = datetime('now', ?)
-     WHERE jornada_id = ? AND tipo = ?`);
-
-  // Marina: 5/6 — RG em revisão, CPF aprovado, comprovante devolvido, dados bancários aprovados
-  setDoc.run('em_revisao', JSON.stringify({ numero: '12.345.678-9', nome: 'Marina S. Santos' }), null, '-1 day', jMarina, 'rg');
-  setDoc.run('aprovado', JSON.stringify({ numero: '123.456.789-00' }), null, '-1 day', jMarina, 'cpf');
-  setDoc.run('devolvido', JSON.stringify({ titular: 'Ana Souza dos Santos', terceiro: true }), 'foto_escura, numero_coberto', '-2 days', jMarina, 'comprovante');
-  setDoc.run('aprovado', JSON.stringify({ agencia: '0001', conta: '12345-6' }), null, '-2 days', jMarina, 'dados_bancarios');
-
-  // João: 4/6 com 1 devolvido
-  setDoc.run('devolvido', JSON.stringify({ numero: '98.765.432-1' }), 'foto_tremida', '-3 days', jJoao, 'rg');
-  setDoc.run('aprovado', JSON.stringify({ numero: '987.654.321-00' }), null, '-3 days', jJoao, 'cpf');
-  setDoc.run('em_revisao', JSON.stringify({}), null, '-2 days', jJoao, 'comprovante');
-  setDoc.run('em_revisao', JSON.stringify({}), null, '-2 days', jJoao, 'ctps');
-
-  // Carla: 6/6 aprovada (pronta)
-  for (const d of CATALOGO.CLT.slice(0, 6)) {
-    setDoc.run('aprovado', JSON.stringify({}), null, '-4 days', jCarla, d.tipo);
+  if (!email || !senha) {
+    console.warn('Banco vazio: defina SEED_RH_EMAIL e SEED_RH_PASSWORD para criar o primeiro usuário RH.');
+    return;
   }
 
-  auditar(rhId, 'seed', 'jornada', jMarina, null, 'exemplos de demonstração');
-  console.log('Seed concluído: renata@empresa.com/admin123, marina@exemplo.com/senha123 (+joao, carla)');
+  const { lastInsertRowid: rhId } = db.prepare(
+    `INSERT INTO users (nome, email, senha_hash, papel) VALUES (?, ?, ?, ?)`
+  ).run(nome, email, bcrypt.hashSync(senha, 10), 'rh');
+  auditar(null, 'seed', 'user', rhId, null, 'rh inicial');
+  console.log(`Seed concluído: usuário RH ${email}`);
 }
 
 initSchema();

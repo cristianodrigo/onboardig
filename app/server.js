@@ -28,7 +28,7 @@ app.use(session({
     httpOnly: true,
     sameSite: 'lax',
     maxAge: 8 * 3600000,
-    secure: process.env.COOKIE_SECURE === 'true',
+    secure: process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production',
   },
 }));
 
