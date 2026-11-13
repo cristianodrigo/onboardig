@@ -1,30 +1,31 @@
 import { Router } from 'express';
-import { db, auditar } from '../db.js';
+import { query, auditar, withTransaction } from '../db.js';
 
 const router = Router();
-
 const apenasDigitos = (s) => String(s || '').replace(/\D/g, '');
 
-function conviteValido(token) {
-  return db.prepare(
+async function conviteValido(token) {
+  const [row] = await query(
     `SELECT c.*, u.nome, u.email, u.cpf, u.ativo, u.papel
      FROM convites c JOIN users u ON u.id = c.user_id
-     WHERE c.token = ? AND c.revogado = 0 AND c.usado_em IS NULL
-       AND datetime(c.expira_em) > datetime('now')`
-  ).get(token);
+     WHERE c.token = $1 AND c.revogado = false AND c.usado_em IS NULL
+       AND c.expira_em > now()`,
+    [token]
+  );
+  return row;
 }
 
-router.get('/convite/:token', (req, res) => {
-  const c = conviteValido(req.params.token);
+router.get('/convite/:token', async (req, res) => {
+  const c = await conviteValido(req.params.token);
   if (!c || !c.ativo || c.papel !== 'candidato') {
     return res.status(410).json({ erro: 'Link expirado ou já utilizado. Peça um novo link ao RH.' });
   }
   res.json({ nome: c.nome.split(' ')[0], pede_cpf: !!c.cpf });
 });
 
-router.post('/convite', (req, res) => {
+router.post('/convite', async (req, res) => {
   const { token, cpf } = req.body || {};
-  const c = conviteValido(String(token || ''));
+  const c = await conviteValido(String(token || ''));
   if (!c || !c.ativo || c.papel !== 'candidato') {
     return res.status(410).json({ erro: 'Link expirado ou já utilizado. Peça um novo link ao RH.' });
   }
@@ -32,10 +33,12 @@ router.post('/convite', (req, res) => {
     return res.status(401).json({ erro: 'CPF não confere com o cadastro. Confira os números.' });
   }
 
-  db.prepare(`UPDATE convites SET usado_em = datetime('now') WHERE id = ?`).run(c.id);
+  await withTransaction(async (client) => {
+    await query(`UPDATE convites SET usado_em = now() WHERE id = $1`, [c.id], client);
+    await auditar(c.user_id, 'acesso_convite', 'user', c.user_id, null, null, client);
+  });
   req.session.user = { id: c.user_id, nome: c.nome, email: c.email, papel: 'candidato' };
-  req.session.cookie.maxAge = 7 * 24 * 3600000; // candidato entra pelo link por até 7 dias
-  auditar(c.user_id, 'acesso_convite', 'user', c.user_id);
+  req.session.cookie.maxAge = 7 * 24 * 3600000;
   res.json({ usuario: req.session.user });
 });
 

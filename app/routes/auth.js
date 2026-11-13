@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { db, auditar } from '../db.js';
+import { query, auditar } from '../db.js';
 
 const router = Router();
 
@@ -21,18 +21,21 @@ export function requireCandidato(req, res, next) {
   next();
 }
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, senha } = req.body || {};
   if (!email || !senha) return res.status(400).json({ erro: 'Informe e-mail e senha.' });
 
-  const user = db.prepare(`SELECT * FROM users WHERE email = ?`).get(String(email).toLowerCase().trim());
+  const [user] = await query(
+    `SELECT * FROM users WHERE email = $1`,
+    [String(email).toLowerCase().trim()]
+  );
   if (!user || !bcrypt.compareSync(senha, user.senha_hash)) {
     return res.status(401).json({ erro: 'E-mail ou senha inválidos.' });
   }
   if (!user.ativo) return res.status(403).json({ erro: 'Usuário desativado. Fale com o RH.' });
 
   req.session.user = { id: user.id, nome: user.nome, email: user.email, papel: user.papel };
-  auditar(user.id, 'login', 'user', user.id);
+  await auditar(user.id, 'login', 'user', user.id);
   res.json({ usuario: req.session.user });
 });
 
