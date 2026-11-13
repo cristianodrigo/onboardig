@@ -1,14 +1,26 @@
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import fs from 'node:fs';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { CATALOGO, TIPOS_CONTRATO } from './catalogo.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, 'onboardig.db');
+const legacyPath = path.join(__dirname, 'onboardig.db');
+const dbPath = path.resolve(process.env.DATABASE_PATH?.trim() || legacyPath);
+
+fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+
+if (dbPath !== legacyPath && !fs.existsSync(dbPath) && fs.existsSync(legacyPath)) {
+  for (const suffix of ['', '-wal', '-shm']) {
+    const from = legacyPath + suffix;
+    if (fs.existsSync(from)) fs.copyFileSync(from, dbPath + suffix);
+  }
+}
 
 export const db = new DatabaseSync(dbPath);
+console.log(`SQLite: ${dbPath}`);
 
 export { CATALOGO, TIPOS_CONTRATO };
 
