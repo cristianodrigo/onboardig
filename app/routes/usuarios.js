@@ -100,8 +100,12 @@ router.post('/usuarios/:id/convite', requireRh, async (req, res) => {
   const renovar = req.body?.renovar !== false;
   let link;
   if (renovar) {
-    link = linkConvite(req, await gerarConvite(user.id));
-    await auditar(req.session.user.id, 'renovar_convite', 'user', user.id, null, '7 dias');
+    const token = await withTransaction(async (client) => {
+      const novo = await gerarConvite(user.id, 7, client);
+      await auditar(req.session.user.id, 'renovar_convite', 'user', user.id, null, '7 dias', client);
+      return novo;
+    });
+    link = linkConvite(req, token);
   } else {
     const [vigente] = await query(
       `SELECT token FROM convites WHERE user_id = $1 AND revogado = false AND usado_em IS NULL
