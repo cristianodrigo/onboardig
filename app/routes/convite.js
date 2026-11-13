@@ -33,10 +33,21 @@ router.post('/convite', async (req, res) => {
     return res.status(401).json({ erro: 'CPF não confere com o cadastro. Confira os números.' });
   }
 
-  await withTransaction(async (client) => {
-    await query(`UPDATE convites SET usado_em = now() WHERE id = $1`, [c.id], client);
+  const marcado = await withTransaction(async (client) => {
+    const rows = await query(
+      `UPDATE convites SET usado_em = now()
+       WHERE id = $1 AND revogado = false AND usado_em IS NULL AND expira_em > now()
+       RETURNING id`,
+      [c.id],
+      client
+    );
+    if (rows.length === 0) return false;
     await auditar(c.user_id, 'acesso_convite', 'user', c.user_id, null, null, client);
+    return true;
   });
+  if (!marcado) {
+    return res.status(410).json({ erro: 'Link expirado ou já utilizado. Peça um novo link ao RH.' });
+  }
   req.session.user = { id: c.user_id, nome: c.nome, email: c.email, papel: 'candidato' };
   req.session.cookie.maxAge = 7 * 24 * 3600000;
   res.json({ usuario: req.session.user });
