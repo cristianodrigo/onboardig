@@ -1,5 +1,7 @@
 // Verificação do catálogo por tipo de contrato e upload dinâmico.
 // Uso: node scripts/test-catalogo.mjs  (servidor na porta 8765)
+import pg from 'pg';
+
 const BASE = 'http://localhost:8765';
 
 async function login(email, senha) {
@@ -82,13 +84,23 @@ console.log('7. progresso Caio:', detCaio.candidato.progresso.enviados, 'de', de
   '| campos VT:', detCaio.documentos.find((d) => d.tipo === 'vale_transporte').campos.length);
 
 // 8. Limpeza
-const { DatabaseSync } = await import('node:sqlite');
-const db = new DatabaseSync(new URL('../onboardig.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-for (const id of [est.id, pj.id, clt.id]) {
-  db.prepare(`UPDATE auditoria SET autor_id = NULL WHERE autor_id = ?`).run(id);
-  db.prepare(`DELETE FROM convites WHERE user_id = ?`).run(id);
-  db.prepare(`DELETE FROM documentos WHERE jornada_id IN (SELECT id FROM jornadas WHERE user_id = ?)`).run(id);
-  db.prepare(`DELETE FROM jornadas WHERE user_id = ?`).run(id);
-  db.prepare(`DELETE FROM users WHERE id = ?`).run(id);
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  for (const id of [est.id, pj.id, clt.id]) {
+    await client.query('UPDATE auditoria SET autor_id = NULL WHERE autor_id = $1', [id]);
+    await client.query('DELETE FROM convites WHERE user_id = $1', [id]);
+    await client.query('DELETE FROM documentos WHERE jornada_id IN (SELECT id FROM jornadas WHERE user_id = $1)', [id]);
+    await client.query('DELETE FROM jornadas WHERE user_id = $1', [id]);
+    await client.query('DELETE FROM users WHERE id = $1', [id]);
+  }
+  await client.query('COMMIT');
+} catch (err) {
+  await client.query('ROLLBACK');
+  throw err;
+} finally {
+  client.release();
 }
+await pool.end();
 console.log('8. usuarios de teste removidos');

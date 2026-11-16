@@ -1,5 +1,7 @@
 // Verificação do fluxo de convite (link de acesso sem senha).
 // Uso: node scripts/test-convite.mjs  (com o servidor rodando na porta 8765)
+import pg from 'pg';
+
 const BASE = 'http://localhost:8765';
 
 async function login(email, senha) {
@@ -65,11 +67,21 @@ const info2 = await (await fetch(`${BASE}/api/convite/${token2}`)).json();
 console.log('7. link renovado:', info2);
 
 // 8. Limpeza: remove usuário de teste
-const { DatabaseSync } = await import('node:sqlite');
-const db = new DatabaseSync(new URL('../onboardig.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-db.prepare(`UPDATE auditoria SET autor_id = NULL WHERE autor_id = ?`).run(criado.id);
-db.prepare(`DELETE FROM convites WHERE user_id = ?`).run(criado.id);
-db.prepare(`DELETE FROM documentos WHERE jornada_id = ?`).run(criado.jornada_id);
-db.prepare(`DELETE FROM jornadas WHERE user_id = ?`).run(criado.id);
-db.prepare(`DELETE FROM users WHERE id = ?`).run(criado.id);
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const client = await pool.connect();
+try {
+  await client.query('BEGIN');
+  await client.query('UPDATE auditoria SET autor_id = NULL WHERE autor_id = $1', [criado.id]);
+  await client.query('DELETE FROM convites WHERE user_id = $1', [criado.id]);
+  await client.query('DELETE FROM documentos WHERE jornada_id IN (SELECT id FROM jornadas WHERE user_id = $1)', [criado.id]);
+  await client.query('DELETE FROM jornadas WHERE user_id = $1', [criado.id]);
+  await client.query('DELETE FROM users WHERE id = $1', [criado.id]);
+  await client.query('COMMIT');
+} catch (err) {
+  await client.query('ROLLBACK');
+  throw err;
+} finally {
+  client.release();
+}
+await pool.end();
 console.log('8. usuario de teste removido');

@@ -1,4 +1,6 @@
 // Testa upload no storage ativo (Azure ou local) e confirma onde o arquivo ficou.
+import pg from 'pg';
+
 const BASE = 'http://localhost:8765';
 
 async function login(email, senha) {
@@ -26,14 +28,14 @@ const up = await fetch(`${BASE}/api/documentos/rg/upload`, {
 });
 console.log('1. upload:', up.status, await up.json());
 
-const { DatabaseSync } = await import('node:sqlite');
-const db = new DatabaseSync(new URL('../onboardig.db', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'));
-const row = db.prepare(
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const { rows } = await pool.query(
   `SELECT d.arquivo_path, d.arquivo_nome, d.status
    FROM documentos d JOIN jornadas j ON j.id = d.jornada_id
    JOIN users u ON u.id = j.user_id
    WHERE u.email = 'marina@exemplo.com' AND d.tipo = 'rg'`
-).get();
+);
+const row = rows[0];
 const azure = String(row?.arquivo_path || '').startsWith('azure:');
 console.log('2. arquivo_path:', azure ? row.arquivo_path : row?.arquivo_path);
 console.log('3. storage:', azure ? 'AZURE BLOB' : 'DISCO LOCAL', '| status:', row?.status, '| nome:', row?.arquivo_nome);
@@ -45,3 +47,4 @@ const det = await (await fetch(`${BASE}/api/candidatos/${marinaC.jornada_id}`, {
 const rg = det.documentos.find((d) => d.tipo === 'rg');
 const down = await fetch(`${BASE}/api/documentos/${rg.id}/arquivo`, { headers: { cookie: rh } });
 console.log('4. download RH:', down.status, down.headers.get('content-type'));
+await pool.end();

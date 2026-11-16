@@ -36,7 +36,7 @@ Com o banco vazio, o app cria um único usuário RH se `SEED_RH_EMAIL` e `SEED_R
 ## O que funciona
 
 - **Login com papéis** (candidato/RH), sessão por cookie httpOnly, senha com bcrypt
-- **Link de convite sem senha** (candidato): o RH cria o candidato sem senha e recebe um link (válido por 7 dias, uso único, renovável). Se o CPF for informado no cadastro, o candidato confirma o CPF ao abrir o link. Renovar o link revoga os anteriores
+- **Link de convite sem senha** (candidato): o RH cria o candidato sem senha e o sistema envia o link por e-mail (SMTP). O link vale 7 dias, uso único, renovável. Se o CPF for informado no cadastro, o candidato confirma o CPF ao abrir o link. Renovar o link revoga os anteriores
 - **Gerenciamento de usuários** (só RH): criar, editar, resetar senha, ativar/desativar, gerar/renovar link de acesso em `/usuarios.html`. Criar candidato já gera a jornada CLT com o checklist de 6 documentos
 - **Tipos de contrato** (escolhido pelo RH ao criar o candidato): **CLT** (18 documentos), **Estágio** (14, com termo de compromisso) e **PJ/CNPJ** (8, com cartão CNPJ). Cada documento tem seus próprios campos estruturados (catálogo em `catalogo.js`)
 - **Candidato**: boas-vindas, checklist com progresso real, formulário dinâmico por documento, upload de arquivo (JPG/PNG/PDF, 10 MB), correção de documento devolvido com motivo e dicas
@@ -46,7 +46,15 @@ Com o banco vazio, o app cria um único usuário RH se `SEED_RH_EMAIL` e `SEED_R
 
 ## Stack
 
-Node 24 (SQLite embutido via `node:sqlite`), Express, express-session, multer, bcryptjs, `@azure/storage-blob`. Banco em arquivo `onboardig.db`. Uploads: Azure Blob (se configurado) ou pasta `uploads/`.
+Node 24, Express, `pg`, Postgres 16. Desenvolvimento sobe com `docker compose up -d` na raiz. A URL fica em `DATABASE_URL`. Uploads: Azure Blob (se configurado) ou pasta `uploads/`.
+
+## Ordem da virada
+
+1. Criar o Postgres no Dokploy, no mesmo projeto do onboarding, e colocar a URL interna em `DATABASE_URL` do script.
+2. `SQLITE_PATH=/data/onboardig.db` aponta para o volume `onboarding-sqlite`. Rodar `node scripts/migrar-sqlite.mjs`.
+3. Se a saída for `Postgres já tem dados. Esvazie as tabelas antes de copiar.`, o app subiu antes da cópia. Pare o app, esvazie as tabelas e rode o script de novo.
+4. Só então grave `DATABASE_URL` no app e publique.
+5. Conferir login do RH, a lista de usuários e a contagem igual à do SQLite. O volume SQLite fica até essa conferência.
 
 ## Verificação
 
@@ -54,4 +62,4 @@ Com o servidor no ar: `node scripts/test-upload.mjs` — exercita upload, revis�
 
 ## Fora de escopo (fase 2 do PRD)
 
-Exportação para o Sênior, link mágico por e-mail, OCR, notificações reais.
+Exportação para o Sênior, OCR, notificações além do convite.
