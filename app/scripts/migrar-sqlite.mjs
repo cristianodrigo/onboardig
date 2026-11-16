@@ -32,6 +32,7 @@ export async function migrar({ sqlitePath, databaseUrl }) {
   origem.close();
 
   await withTransaction(async (client) => {
+    await client.query(`SET LOCAL TIME ZONE 'UTC'`);
     for (const row of users) {
       await query(
         `INSERT INTO users (id, nome, email, senha_hash, papel, ativo, criado_em, cpf)

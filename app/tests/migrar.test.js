@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import pg from 'pg';
 import { DatabaseSync } from 'node:sqlite';
 import { preparar } from './banco.js';
 
@@ -46,12 +47,16 @@ function sqliteComUmaLinha(arquivo) {
 
 test('cópia preserva ids e a segunda execução não altera o destino', async () => {
   await preparar('onboarding_migrar_test');
+  const admin = new pg.Client({ connectionString: 'postgres://onboarding:onboarding@localhost:5432/postgres' });
+  await admin.connect();
+  await admin.query(`ALTER DATABASE onboarding_migrar_test SET TIME ZONE 'America/Sao_Paulo'`);
+  await admin.end();
   const arquivo = path.join(os.tmpdir(), `onboardig-copia-${Date.now()}.db`);
   sqliteComUmaLinha(arquivo);
   const { migrar } = await import('../scripts/migrar-sqlite.mjs');
   await migrar({ sqlitePath: arquivo, databaseUrl: process.env.DATABASE_URL });
   const { query, closePool } = await import('../db.js');
-  const [user] = await query(`SELECT id, email, ativo FROM users`);
+  const [user] = await query(`SELECT id, email, ativo, to_char(criado_em AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS') AS criado_em FROM users`);
   const [jornada] = await query(`SELECT id, user_id FROM jornadas`);
   const [doc] = await query(`SELECT id, jornada_id FROM documentos`);
   const [convite] = await query(`SELECT id, revogado FROM convites`);
@@ -60,6 +65,7 @@ test('cópia preserva ids e a segunda execução não altera o destino', async (
     [user.id, user.email, user.ativo, jornada.id, jornada.user_id, doc.id, doc.jornada_id, convite.id, convite.revogado, aud.id, aud.autor_id],
     [4, 'ana@exemplo.com', true, 8, 4, 15, 8, 3, false, 9, null]
   );
+  assert.equal(user.criado_em, '2026-01-02 03:04:05');
   await assert.rejects(
     () => migrar({ sqlitePath: arquivo, databaseUrl: process.env.DATABASE_URL }),
     /Postgres já tem dados/

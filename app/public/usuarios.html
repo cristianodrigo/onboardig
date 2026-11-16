@@ -120,7 +120,7 @@
           <button class="mini" data-acao="editar" data-id="${u.id}">Editar</button>
           <button class="mini" data-acao="senha" data-id="${u.id}">Resetar senha</button>
           ${u.papel === 'candidato' ? `<button class="mini" data-acao="convite" data-id="${u.id}" data-nome="${esc(u.nome)}">${u.convite_status === 'ativo' ? 'Renovar link' : 'Gerar link'}</button>` : ''}
-          ${u.id !== eu.id ? `<button class="mini ${u.ativo ? 'danger' : 'ok'}" data-acao="toggle" data-id="${u.id}" data-ativo="${u.ativo}">${u.ativo ? 'Desativar' : 'Reativar'}</button>` : ''}
+          ${u.id !== eu.id ? `<button class="mini ${u.ativo ? 'danger' : 'ok'}" data-acao="toggle" data-id="${u.id}" data-ativo="${u.ativo ? '1' : '0'}">${u.ativo ? 'Desativar' : 'Reativar'}</button>` : ''}
         </div></td>
       </tr>`).join('');
 

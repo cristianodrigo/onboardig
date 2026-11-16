@@ -10,7 +10,12 @@ let pool;
 function getPool() {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) throw new Error('Defina DATABASE_URL.');
-  if (!pool) pool = new pg.Pool({ connectionString: url, max: 10 });
+  if (!pool) {
+    pool = new pg.Pool({ connectionString: url, max: 10 });
+    pool.on('error', (err) => {
+      console.error('Conexão ociosa do Postgres caiu:', err.message);
+    });
+  }
   return pool;
 }
 
